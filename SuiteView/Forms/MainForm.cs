@@ -19,6 +19,8 @@ public partial class MainForm : Form
     private Label _titleLabel = null!;
     private Button _closeButton = null!;
     private Button _snapButton = null!;
+    private Button _scanDirButton = null!;
+    private Button _dbLibraryButton = null!;
     private Form? _parentBorderForm;
     private WordDocumentManager? _wordDocManager;
 
@@ -108,7 +110,41 @@ public partial class MainForm : Form
         _snapButton.FlatAppearance.MouseOverBackColor = Color.Transparent;
         _snapButton.Click += SnapButton_Click;
 
+        // Scan Directory button (transparent - will be drawn as round in Paint)
+        _scanDirButton = new Button
+        {
+            Text = "",
+            Size = new Size(120, 32),
+            Location = new Point(20, 65), // Will be adjusted in UpdateLayout
+            FlatStyle = FlatStyle.Flat,
+            BackColor = Color.Transparent,
+            Cursor = Cursors.Hand,
+            TabStop = false
+        };
+        _scanDirButton.FlatAppearance.BorderSize = 0;
+        _scanDirButton.FlatAppearance.MouseDownBackColor = Color.Transparent;
+        _scanDirButton.FlatAppearance.MouseOverBackColor = Color.Transparent;
+        _scanDirButton.Click += ScanDirButton_Click;
+
+        // DB Library button (transparent - will be drawn as round in Paint)
+        _dbLibraryButton = new Button
+        {
+            Text = "",
+            Size = new Size(120, 32),
+            Location = new Point(20, 110), // Will be adjusted in UpdateLayout
+            FlatStyle = FlatStyle.Flat,
+            BackColor = Color.Transparent,
+            Cursor = Cursors.Hand,
+            TabStop = false
+        };
+        _dbLibraryButton.FlatAppearance.BorderSize = 0;
+        _dbLibraryButton.FlatAppearance.MouseDownBackColor = Color.Transparent;
+        _dbLibraryButton.FlatAppearance.MouseOverBackColor = Color.Transparent;
+        _dbLibraryButton.Click += DbLibraryButton_Click;
+
         _contentPanel.Controls.Add(_snapButton);
+        _contentPanel.Controls.Add(_scanDirButton);
+        _contentPanel.Controls.Add(_dbLibraryButton);
 
         this.Controls.Add(_contentPanel);
         this.Controls.Add(_titleLabel);
@@ -143,6 +179,12 @@ public partial class MainForm : Form
 
         // Position snap button in content panel
         _snapButton.Location = new Point(20, 20);
+        
+        // Position scan directory button below snap button
+        _scanDirButton.Location = new Point(20, 65);
+        
+        // Position DB library button below scan directory button
+        _dbLibraryButton.Location = new Point(20, 110);
     }
 
     private void ApplyTheme()
@@ -251,6 +293,12 @@ public partial class MainForm : Form
 
         // Draw rounded snap button
         DrawRoundedSnapButton(g);
+        
+        // Draw rounded scan directory button
+        DrawRoundedScanDirButton(g);
+        
+        // Draw rounded DB library button
+        DrawRoundedDbLibraryButton(g);
     }
 
     private void DrawRoundCloseButton(Graphics g)
@@ -305,6 +353,76 @@ public partial class MainForm : Form
         using (var brush = new SolidBrush(_currentTheme.Primary))
         {
             var text = "Snap";
+            var size = g.MeasureString(text, font);
+            var x = buttonRect.X + (buttonRect.Width - size.Width) / 2;
+            var y = buttonRect.Y + (buttonRect.Height - size.Height) / 2;
+            g.DrawString(text, font, brush, x, y);
+        }
+    }
+
+    private void DrawRoundedScanDirButton(Graphics g)
+    {
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
+        // Button position in content panel coordinates
+        var buttonRect = _scanDirButton.Bounds;
+
+        // Draw rounded brass background
+        const int cornerRadius = 16;
+        using (var path = new System.Drawing.Drawing2D.GraphicsPath())
+        {
+            path.AddArc(buttonRect.X, buttonRect.Y, cornerRadius, cornerRadius, 180, 90);
+            path.AddArc(buttonRect.Right - cornerRadius, buttonRect.Y, cornerRadius, cornerRadius, 270, 90);
+            path.AddArc(buttonRect.Right - cornerRadius, buttonRect.Bottom - cornerRadius, cornerRadius, cornerRadius, 0, 90);
+            path.AddArc(buttonRect.X, buttonRect.Bottom - cornerRadius, cornerRadius, cornerRadius, 90, 90);
+            path.CloseFigure();
+
+            using (var brush = new SolidBrush(_currentTheme.Accent))
+            {
+                g.FillPath(brush, path);
+            }
+        }
+
+        // Draw "Scan Directory" text in blue
+        using (var font = new Font("Segoe UI", 9f, FontStyle.Bold))
+        using (var brush = new SolidBrush(_currentTheme.Primary))
+        {
+            var text = "Scan Directory";
+            var size = g.MeasureString(text, font);
+            var x = buttonRect.X + (buttonRect.Width - size.Width) / 2;
+            var y = buttonRect.Y + (buttonRect.Height - size.Height) / 2;
+            g.DrawString(text, font, brush, x, y);
+        }
+    }
+
+    private void DrawRoundedDbLibraryButton(Graphics g)
+    {
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
+        // Button position in content panel coordinates
+        var buttonRect = _dbLibraryButton.Bounds;
+
+        // Draw rounded brass background
+        const int cornerRadius = 16;
+        using (var path = new System.Drawing.Drawing2D.GraphicsPath())
+        {
+            path.AddArc(buttonRect.X, buttonRect.Y, cornerRadius, cornerRadius, 180, 90);
+            path.AddArc(buttonRect.Right - cornerRadius, buttonRect.Y, cornerRadius, cornerRadius, 270, 90);
+            path.AddArc(buttonRect.Right - cornerRadius, buttonRect.Bottom - cornerRadius, cornerRadius, cornerRadius, 0, 90);
+            path.AddArc(buttonRect.X, buttonRect.Bottom - cornerRadius, cornerRadius, cornerRadius, 90, 90);
+            path.CloseFigure();
+
+            using (var brush = new SolidBrush(_currentTheme.Accent))
+            {
+                g.FillPath(brush, path);
+            }
+        }
+
+        // Draw "DB Library" text in blue
+        using (var font = new Font("Segoe UI", 9f, FontStyle.Bold))
+        using (var brush = new SolidBrush(_currentTheme.Primary))
+        {
+            var text = "DB Library";
             var size = g.MeasureString(text, font);
             var x = buttonRect.X + (buttonRect.Width - size.Width) / 2;
             var y = buttonRect.Y + (buttonRect.Height - size.Height) / 2;
@@ -369,6 +487,56 @@ public partial class MainForm : Form
             MessageBox.Show(
                 $"Error taking screenshot: {ex.Message}",
                 "Screenshot Error",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
+    }
+
+    private void ScanDirButton_Click(object? sender, EventArgs e)
+    {
+        try
+        {
+            // Create the Directory Scanner with the iconic bordered window look
+            var contentForm = new DirectoryScannerContentForm(_currentTheme);
+            var borderedWindow = new BorderedWindowForm(
+                _currentTheme,
+                initialSize: new Size(1000, 600),
+                minimumSize: new Size(800, 400)
+            );
+            borderedWindow.Text = "Directory Scanner";
+            borderedWindow.SetContentForm(contentForm);
+            borderedWindow.Show();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"Error opening Directory Scanner: {ex.Message}",
+                "Error",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
+    }
+
+    private void DbLibraryButton_Click(object? sender, EventArgs e)
+    {
+        try
+        {
+            // Create the Database Library Manager with the iconic bordered window look
+            var contentForm = new DatabaseLibraryManagerContentForm(_currentTheme);
+            var borderedWindow = new BorderedWindowForm(
+                _currentTheme,
+                initialSize: new Size(1200, 700),
+                minimumSize: new Size(900, 500)
+            );
+            borderedWindow.Text = "Database Library Manager";
+            borderedWindow.SetContentForm(contentForm);
+            borderedWindow.Show();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"Error opening Directory Scanner: {ex.Message}",
+                "Error",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
         }
