@@ -17,7 +17,10 @@ public partial class DatabaseLibraryManagerContentForm : Form, IContentForm
     private Label _titleLabel = null!;
     private Button _closeButton = null!;
     private Panel _contentPanel = null!;
-    private TreeView _treeView = null!;
+    private TreeView _queriesTreeView = null!;
+    private TreeView _dataTreeView = null!;
+    private Label _queriesHeaderLabel = null!;
+    private Label _dataHeaderLabel = null!;
     private ListView _tablesListView = null!;
     private ListView _fieldsListView = null!;
     private Button _scanButton = null!;
@@ -44,9 +47,13 @@ public partial class DatabaseLibraryManagerContentForm : Form, IContentForm
     
     // Data
     private DatabaseLibraryConfig _config = null!;
-    private TreeNode? _lifeProdNode;
     private TreeNode? _myLibraryNode;
     private TreeNode? _myQueriesNode;
+    private TreeNode? _queriesNewNode;
+    private TreeNode? _companyDataNode;
+    private TreeNode? _ulRatesNode;
+    private TreeNode? _vrdProdNode;
+    private TreeNode? _cyberlifeNode;
     private TableMetadata? _currentTable;
     private TreeNode? _currentQueryNode;
     private QueryDefinition? _currentQuery;
@@ -57,7 +64,8 @@ public partial class DatabaseLibraryManagerContentForm : Form, IContentForm
     private const int TitleBarHeight = 35;
     private const int FooterHeight = 35;
     private const int ControlMargin = 10;
-    private const int TreeViewWidth = 250;
+    private const int QueriesTreeWidth = 220;
+    private const int DataTreeWidth = 260;
     
     // Dragging support
     private bool _isDragging;
@@ -126,8 +134,16 @@ public partial class DatabaseLibraryManagerContentForm : Form, IContentForm
             BackColor = _currentTheme.Secondary
         };
 
-        // TreeView (left side)
-        _treeView = new TreeView
+        // My Queries header and tree (left column)
+        _queriesHeaderLabel = new Label
+        {
+            Text = "My Queries",
+            Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+            ForeColor = Color.White,
+            AutoSize = true,
+            BackColor = Color.Transparent
+        };
+        _queriesTreeView = new TreeView
         {
             BackColor = _currentTheme.Secondary,
             ForeColor = Color.White,
@@ -138,7 +154,30 @@ public partial class DatabaseLibraryManagerContentForm : Form, IContentForm
             ShowRootLines = true,
             FullRowSelect = true
         };
-        _treeView.AfterSelect += TreeView_AfterSelect;
+        _queriesTreeView.AfterSelect += QueriesTreeView_AfterSelect;
+
+        // Data Sources header and tree (middle column)
+        _dataHeaderLabel = new Label
+        {
+            Text = "Data Sources",
+            Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+            ForeColor = Color.White,
+            AutoSize = true,
+            BackColor = Color.Transparent
+        };
+        _dataTreeView = new TreeView
+        {
+            BackColor = _currentTheme.Secondary,
+            ForeColor = Color.White,
+            BorderStyle = BorderStyle.FixedSingle,
+            Font = new Font("Segoe UI", 10f),
+            ShowLines = true,
+            ShowPlusMinus = true,
+            ShowRootLines = true,
+            FullRowSelect = true
+        };
+        _dataTreeView.AfterSelect += DataTreeView_AfterSelect;
+        _dataTreeView.ItemDrag += TreeView_ItemDrag;
 
         // Tables ListView (right side - for showing tables)
         _tablesListView = new ListView
@@ -371,8 +410,11 @@ public partial class DatabaseLibraryManagerContentForm : Form, IContentForm
         _queryBuilderPanel.Controls.Add(_saveQueryButton);
         _queryBuilderPanel.Controls.Add(_queryTabControl);
 
-        // Add controls to content panel
-        _contentPanel.Controls.Add(_treeView);
+    // Add controls to content panel
+    _contentPanel.Controls.Add(_queriesHeaderLabel);
+    _contentPanel.Controls.Add(_queriesTreeView);
+    _contentPanel.Controls.Add(_dataHeaderLabel);
+    _contentPanel.Controls.Add(_dataTreeView);
         _contentPanel.Controls.Add(_tablesListView);
         _contentPanel.Controls.Add(_fieldsListView);
         _contentPanel.Controls.Add(_newQueryPanel);
@@ -410,13 +452,21 @@ public partial class DatabaseLibraryManagerContentForm : Form, IContentForm
         
         _contentPanel.Size = new Size(this.Width, this.Height - TitleBarHeight);
 
-        // TreeView on the left
-        _treeView.Location = new Point(ControlMargin, ControlMargin);
-        _treeView.Size = new Size(TreeViewWidth, _contentPanel.Height - (ControlMargin * 2) - FooterHeight);
+    // Left column: My Queries
+    int queriesHeaderHeight = 20;
+    _queriesHeaderLabel.Location = new Point(ControlMargin, ControlMargin);
+    _queriesTreeView.Location = new Point(ControlMargin, ControlMargin + queriesHeaderHeight + 4);
+    _queriesTreeView.Size = new Size(QueriesTreeWidth, _contentPanel.Height - (ControlMargin * 2) - FooterHeight - queriesHeaderHeight - 4);
 
-        // Right panel area (for ListViews)
-        int rightPanelX = TreeViewWidth + (ControlMargin * 2);
-        int rightPanelWidth = _contentPanel.Width - TreeViewWidth - (ControlMargin * 3);
+    // Middle column: Data Sources
+    int dataLeft = ControlMargin + QueriesTreeWidth + ControlMargin;
+    _dataHeaderLabel.Location = new Point(dataLeft, ControlMargin);
+    _dataTreeView.Location = new Point(dataLeft, ControlMargin + queriesHeaderHeight + 4);
+    _dataTreeView.Size = new Size(DataTreeWidth, _contentPanel.Height - (ControlMargin * 2) - FooterHeight - queriesHeaderHeight - 4);
+
+    // Right panel area (for ListViews)
+    int rightPanelX = dataLeft + DataTreeWidth + ControlMargin;
+    int rightPanelWidth = _contentPanel.Width - (rightPanelX + ControlMargin);
         int rightPanelHeight = _contentPanel.Height - (ControlMargin * 2) - FooterHeight;
 
         // Tables ListView (on the right when showing tables)
@@ -475,8 +525,10 @@ public partial class DatabaseLibraryManagerContentForm : Form, IContentForm
     {
         this.BackColor = _currentTheme.Secondary;
         _contentPanel.BackColor = _currentTheme.Secondary;
-        _treeView.BackColor = _currentTheme.Secondary;
-        _treeView.ForeColor = Color.White;
+        _queriesTreeView.BackColor = _currentTheme.Secondary;
+        _queriesTreeView.ForeColor = Color.White;
+        _dataTreeView.BackColor = _currentTheme.Secondary;
+        _dataTreeView.ForeColor = Color.White;
         _tablesListView.BackColor = _currentTheme.Secondary;
         _tablesListView.ForeColor = Color.White;
         _fieldsListView.BackColor = _currentTheme.Secondary;
@@ -487,29 +539,25 @@ public partial class DatabaseLibraryManagerContentForm : Form, IContentForm
     {
         _config = DatabaseLibraryManager.LoadConfig();
         
-        // Initialize tree view
-        _treeView.Nodes.Clear();
-        
-        // Add LifeProd_Library node
-        _lifeProdNode = new TreeNode("LifeProd_Library")
-        {
-            Tag = "database_source"
-        };
-        _treeView.Nodes.Add(_lifeProdNode);
-        
-        // Add My_Library node
-        _myLibraryNode = new TreeNode("My_Library")
-        {
-            Tag = "user_library"
-        };
-        _treeView.Nodes.Add(_myLibraryNode);
-        
-        // Add My_Queries node (sibling to My_Library)
-        _myQueriesNode = new TreeNode("My_Queries")
-        {
-            Tag = "user_queries"
-        };
-        _treeView.Nodes.Add(_myQueriesNode);
+        // Initialize Queries tree
+        _queriesTreeView.Nodes.Clear();
+        _myQueriesNode = new TreeNode("My_Queries") { Tag = "user_queries" };
+        _queriesTreeView.Nodes.Add(_myQueriesNode);
+        _myQueriesNode.Expand();
+
+        // Initialize Data Sources tree
+        _dataTreeView.Nodes.Clear();
+        _myLibraryNode = new TreeNode("My_Library") { Tag = "user_library" };
+        _companyDataNode = new TreeNode("Company_Data") { Tag = "company_data" };
+        _cyberlifeNode = new TreeNode("CyberlifeDB2") { Tag = "cyberlife_source" };
+        _vrdProdNode = new TreeNode("VRD_Prod") { Tag = "vrd_source" };
+        _ulRatesNode = new TreeNode("UL_Rates") { Tag = "ul_rates_source" };
+        _companyDataNode.Nodes.Add(_cyberlifeNode);
+        _companyDataNode.Nodes.Add(_vrdProdNode);
+        _companyDataNode.Nodes.Add(_ulRatesNode);
+        _dataTreeView.Nodes.Add(_companyDataNode);
+        _dataTreeView.Nodes.Add(_myLibraryNode);
+        _companyDataNode.Expand();
         
         // Load existing library tables
         LoadMyLibrary();
@@ -574,7 +622,7 @@ public partial class DatabaseLibraryManagerContentForm : Form, IContentForm
         }
     }
 
-    private async void TreeView_AfterSelect(object? sender, TreeViewEventArgs e)
+    private void QueriesTreeView_AfterSelect(object? sender, TreeViewEventArgs e)
     {
         // If leaving a query, snapshot current UI into session cache first
         if (_currentQueryNode != null && e.Node != _currentQueryNode)
@@ -582,33 +630,32 @@ public partial class DatabaseLibraryManagerContentForm : Form, IContentForm
             SnapshotQueryToSessionCache();
         }
 
-        if (e.Node == _lifeProdNode)
+        if (e.Node == _myQueriesNode)
         {
-            // Show tables view
+            ShowNewQueryView();
+        }
+        else if (e.Node != null && e.Node.Parent == _myQueriesNode)
+        {
+            ShowQueryBuilderView(e.Node);
+        }
+    }
+
+    private async void DataTreeView_AfterSelect(object? sender, TreeViewEventArgs e)
+    {
+        if (e.Node == _ulRatesNode)
+        {
             ShowTablesView();
             await LoadDatabaseTablesAsync();
         }
         else if (e.Node == _myLibraryNode)
         {
-            // Show empty tables view
             ShowTablesView();
             _tablesListView.Items.Clear();
             _scanButton.Enabled = false;
             _moveToLibraryButton.Enabled = false;
         }
-        else if (e.Node == _myQueriesNode)
-        {
-            // Show new query panel
-            ShowNewQueryView();
-        }
-        else if (e.Node != null && e.Node.Parent == _myQueriesNode)
-        {
-            // User selected a query node
-            ShowQueryBuilderView(e.Node);
-        }
         else if (e.Node != null && e.Node.Parent == _myLibraryNode && e.Node.Tag is TableMetadata table)
         {
-            // Show fields view for the selected table
             ShowFieldsView(table);
         }
     }
@@ -664,22 +711,14 @@ public partial class DatabaseLibraryManagerContentForm : Form, IContentForm
         _displayPanel.Controls.Clear();
 
         // Restore from session cache first (unsaved UI), else from saved query
-        if (_currentQueryNode != null)
+        if (_currentQueryNode != null && _querySessionCache.TryGetValue(_currentQueryNode.Text, out var cached))
         {
-            var key = _currentQueryNode.Text;
-            if (_querySessionCache.TryGetValue(key, out var cached))
-            {
-                RestoreFromSessionCache(cached);
-            }
-            else if (_currentQuery != null)
-            {
-                LoadQueryFields(_currentQuery);
-            }
+            RestoreFromSessionCache(cached);
         }
-        
-        // Enable drag-drop on TreeView fields (remove first to prevent duplicates)
-        _treeView.ItemDrag -= TreeView_ItemDrag;
-        _treeView.ItemDrag += TreeView_ItemDrag;
+        else if (_currentQuery != null)
+        {
+            LoadQueryFields(_currentQuery);
+        }
     }
 
     private void SnapshotQueryToSessionCache()
@@ -1153,8 +1192,8 @@ public partial class DatabaseLibraryManagerContentForm : Form, IContentForm
         // Expand My_Queries to show the new query
         _myQueriesNode?.Expand();
         
-        // Select the new query node
-        _treeView.SelectedNode = queryNode;
+    // Select the new query node in Queries tree
+    _queriesTreeView.SelectedNode = queryNode;
         
         // This will trigger ShowQueryBuilderView via TreeView_AfterSelect
     }
@@ -1296,7 +1335,10 @@ public partial class DatabaseLibraryManagerContentForm : Form, IContentForm
             // Only allow dragging field nodes (nodes with FieldMetadata tag)
             if (node.Tag is FieldMetadata)
             {
-                _treeView.DoDragDrop(node, DragDropEffects.Copy);
+                if (sender is TreeView tv)
+                {
+                    tv.DoDragDrop(node, DragDropEffects.Copy);
+                }
             }
         }
     }
