@@ -45,4 +45,41 @@ public class DatabaseConfig
 public class DatabaseLibraryConfig
 {
     public List<DatabaseConfig> Databases { get; set; } = new();
+    public List<QueryDefinition> Queries { get; set; } = new();
+}
+
+/// <summary>
+/// Represents a saved query with its criteria and display fields
+/// </summary>
+public class QueryDefinition
+{
+    public string Name { get; set; } = string.Empty;
+    public DateTime CreatedDate { get; set; }
+    public DateTime LastModifiedDate { get; set; }
+    public List<QueryCriteriaField> CriteriaFields { get; set; } = new();
+    public List<QueryDisplayField> DisplayFields { get; set; } = new();
+}
+
+/// <summary>
+/// Represents a field in the query criteria (WHERE clause)
+/// </summary>
+public class QueryCriteriaField
+{
+    public string TableName { get; set; } = string.Empty;
+    public string FieldName { get; set; } = string.Empty;
+    public string DataType { get; set; } = string.Empty;
+    public bool HasListBox { get; set; }
+    public List<string> SelectedValues { get; set; } = new();
+    public string TextValue { get; set; } = string.Empty;
+    public int PanelHeight { get; set; } = 80;
+}
+
+/// <summary>
+/// Represents a field in the query display (SELECT clause)
+/// </summary>
+public class QueryDisplayField
+{
+    public string TableName { get; set; } = string.Empty;
+    public string FieldName { get; set; } = string.Empty;
+    public string DataType { get; set; } = string.Empty;
 }
