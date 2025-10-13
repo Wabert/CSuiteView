@@ -72,6 +72,8 @@ public class QueryCriteriaField
     public List<string> SelectedValues { get; set; } = new();
     public string TextValue { get; set; } = string.Empty;
     public int PanelHeight { get; set; } = 80;
+    // Optional operator for string fields (none, equals, contains, begins with, ends with)
+    public string? StringOperator { get; set; }
 }
 
 /// <summary>

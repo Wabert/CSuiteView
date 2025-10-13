@@ -1,6 +1,7 @@
 using SuiteView.Managers;
 using SuiteView.Models;
 using SuiteView.Services;
+using SuiteView.Forms.Controls;
 
 namespace SuiteView.Forms;
 
@@ -49,7 +50,8 @@ public partial class DatabaseLibraryManagerContentForm : Form, IContentForm
     private TableMetadata? _currentTable;
     private TreeNode? _currentQueryNode;
     private QueryDefinition? _currentQuery;
-    private Dictionary<string, (List<Control> criteriaControls, List<Control> displayControls)> _queryControlsCache = new();
+    // In-memory per-session cache so criteria/display persist without pressing Save
+    private readonly Dictionary<string, (List<QueryCriteriaField> criteria, List<QueryDisplayField> display)> _querySessionCache = new();
     
     // Layout constants
     private const int TitleBarHeight = 35;
@@ -574,6 +576,12 @@ public partial class DatabaseLibraryManagerContentForm : Form, IContentForm
 
     private async void TreeView_AfterSelect(object? sender, TreeViewEventArgs e)
     {
+        // If leaving a query, snapshot current UI into session cache first
+        if (_currentQueryNode != null && e.Node != _currentQueryNode)
+        {
+            SnapshotQueryToSessionCache();
+        }
+
         if (e.Node == _lifeProdNode)
         {
             // Show tables view
@@ -593,12 +601,12 @@ public partial class DatabaseLibraryManagerContentForm : Form, IContentForm
             // Show new query panel
             ShowNewQueryView();
         }
-        else if (e.Node?.Parent == _myQueriesNode)
+        else if (e.Node != null && e.Node.Parent == _myQueriesNode)
         {
             // User selected a query node
             ShowQueryBuilderView(e.Node);
         }
-        else if (e.Node?.Parent == _myLibraryNode && e.Node.Tag is TableMetadata table)
+        else if (e.Node != null && e.Node.Parent == _myLibraryNode && e.Node.Tag is TableMetadata table)
         {
             // Show fields view for the selected table
             ShowFieldsView(table);
@@ -654,16 +662,125 @@ public partial class DatabaseLibraryManagerContentForm : Form, IContentForm
         // Clear both panels
         _criteriaPanel.Controls.Clear();
         _displayPanel.Controls.Clear();
-        
-        // Load saved criteria and display fields if query exists
-        if (_currentQuery != null)
+
+        // Restore from session cache first (unsaved UI), else from saved query
+        if (_currentQueryNode != null)
         {
-            LoadQueryFields(_currentQuery);
+            var key = _currentQueryNode.Text;
+            if (_querySessionCache.TryGetValue(key, out var cached))
+            {
+                RestoreFromSessionCache(cached);
+            }
+            else if (_currentQuery != null)
+            {
+                LoadQueryFields(_currentQuery);
+            }
         }
         
         // Enable drag-drop on TreeView fields (remove first to prevent duplicates)
         _treeView.ItemDrag -= TreeView_ItemDrag;
         _treeView.ItemDrag += TreeView_ItemDrag;
+    }
+
+    private void SnapshotQueryToSessionCache()
+    {
+        if (_currentQueryNode == null) return;
+
+        var criteriaSnapshot = new List<QueryCriteriaField>();
+        foreach (Control control in _criteriaPanel.Controls)
+        {
+            if (control is SuiteView.Forms.Controls.CriteriaFieldControl cfc)
+            {
+                criteriaSnapshot.Add(cfc.ToQueryCriteriaField());
+            }
+            else if (control is RoundedPanel panel && panel.Tag != null)
+            {
+                var tag = panel.Tag;
+                var tableProperty = tag.GetType().GetProperty("Table");
+                var fieldProperty = tag.GetType().GetProperty("Field");
+                if (tableProperty == null || fieldProperty == null) continue;
+                var table = tableProperty.GetValue(tag) as TableMetadata;
+                var field = fieldProperty.GetValue(tag) as FieldMetadata;
+                if (table == null || field == null) continue;
+
+                var snapshot = new QueryCriteriaField
+                {
+                    TableName = table.TableName,
+                    FieldName = field.FieldName,
+                    DataType = field.DataType,
+                    PanelHeight = panel.Height
+                };
+
+                var listBox = panel.Controls.OfType<CheckedListBox>().FirstOrDefault();
+                if (listBox != null)
+                {
+                    snapshot.HasListBox = true;
+                    snapshot.SelectedValues = listBox.CheckedItems.Cast<string>().ToList();
+                }
+                else
+                {
+                    var textBox = panel.Controls.OfType<TextBox>().FirstOrDefault();
+                    snapshot.HasListBox = false;
+                    snapshot.TextValue = textBox?.Text ?? string.Empty;
+                }
+
+                criteriaSnapshot.Add(snapshot);
+            }
+        }
+
+        var displaySnapshot = new List<QueryDisplayField>();
+        foreach (Control control in _displayPanel.Controls)
+        {
+            if (control is RoundedPanel panel && panel.Tag != null)
+            {
+                var tag = panel.Tag;
+                var tableProperty = tag.GetType().GetProperty("Table");
+                var fieldProperty = tag.GetType().GetProperty("Field");
+                if (tableProperty == null || fieldProperty == null) continue;
+                var table = tableProperty.GetValue(tag) as TableMetadata;
+                var field = fieldProperty.GetValue(tag) as FieldMetadata;
+                if (table == null || field == null) continue;
+
+                displaySnapshot.Add(new QueryDisplayField
+                {
+                    TableName = table.TableName,
+                    FieldName = field.FieldName,
+                    DataType = field.DataType
+                });
+            }
+        }
+
+        _querySessionCache[_currentQueryNode.Text] = (criteriaSnapshot, displaySnapshot);
+    }
+
+    private void RestoreFromSessionCache((List<QueryCriteriaField> criteria, List<QueryDisplayField> display) cached)
+    {
+        // Get reference to LifeProd database for field metadata
+        var lifeProdDb = _config.Databases.FirstOrDefault(d => d.Name == "LifeProd_Library");
+        if (lifeProdDb == null) return;
+
+        // Restore criteria
+        foreach (var c in cached.criteria)
+        {
+            var table = lifeProdDb.Tables.FirstOrDefault(t => t.TableName == c.TableName);
+            if (table == null) continue;
+            var field = table.Fields.FirstOrDefault(f => f.FieldName == c.FieldName);
+            if (field == null) continue;
+            var tableMetadata = new TableMetadata { TableName = table.TableName };
+            var panel = CreateCriteriaFieldPanelFromSaved(tableMetadata, field, c);
+            _criteriaPanel.Controls.Add(panel);
+        }
+
+        // Restore display
+        foreach (var d in cached.display)
+        {
+            var table = lifeProdDb.Tables.FirstOrDefault(t => t.TableName == d.TableName);
+            if (table == null) continue;
+            var field = table.Fields.FirstOrDefault(f => f.FieldName == d.FieldName);
+            if (field == null) continue;
+            var tableMetadata = new TableMetadata { TableName = table.TableName };
+            CreateDisplayFieldPanel(tableMetadata, field);
+        }
     }
 
     private void ShowFieldsView(TableMetadata table)
@@ -781,8 +898,9 @@ public partial class DatabaseLibraryManagerContentForm : Form, IContentForm
 
             foreach (ListViewItem item in selectedItems)
             {
-                var table = (TableMetadata)item.Tag;
-                
+                if (item.Tag is not TableMetadata table)
+                    continue;
+
                 // Scan table fields
                 var fields = await DatabaseService.GetTableFieldsAsync("UL_Rates", "UL_Rates", table.TableName);
                 table.Fields = fields;
@@ -821,7 +939,9 @@ public partial class DatabaseLibraryManagerContentForm : Form, IContentForm
         // Mark tables as in library
         foreach (ListViewItem item in selectedItems)
         {
-            var table = (TableMetadata)item.Tag;
+            if (item.Tag is not TableMetadata table)
+                continue;
+
             if (!table.IsInLibrary && table.LastScanned.HasValue)
             {
                 table.IsInLibrary = true;
@@ -1087,17 +1207,18 @@ public partial class DatabaseLibraryManagerContentForm : Form, IContentForm
             _currentQuery.CriteriaFields.Clear();
             foreach (Control control in _criteriaPanel.Controls)
             {
-                if (control is RoundedPanel panel && panel.Tag != null)
+                if (control is SuiteView.Forms.Controls.CriteriaFieldControl cfc)
+                {
+                    _currentQuery.CriteriaFields.Add(cfc.ToQueryCriteriaField());
+                }
+                else if (control is RoundedPanel panel && panel.Tag != null)
                 {
                     var tag = panel.Tag;
                     var tableProperty = tag.GetType().GetProperty("Table");
                     var fieldProperty = tag.GetType().GetProperty("Field");
-                    
                     if (tableProperty == null || fieldProperty == null) continue;
-                    
                     var table = tableProperty.GetValue(tag) as TableMetadata;
                     var field = fieldProperty.GetValue(tag) as FieldMetadata;
-                    
                     if (table == null || field == null) continue;
 
                     var criteriaField = new QueryCriteriaField
@@ -1107,8 +1228,6 @@ public partial class DatabaseLibraryManagerContentForm : Form, IContentForm
                         DataType = field.DataType,
                         PanelHeight = panel.Height
                     };
-
-                    // Check for CheckedListBox (has unique values)
                     var listBox = panel.Controls.OfType<CheckedListBox>().FirstOrDefault();
                     if (listBox != null)
                     {
@@ -1117,7 +1236,6 @@ public partial class DatabaseLibraryManagerContentForm : Form, IContentForm
                     }
                     else
                     {
-                        // Check for TextBox
                         var textBox = panel.Controls.OfType<TextBox>().FirstOrDefault();
                         if (textBox != null)
                         {
@@ -1125,7 +1243,6 @@ public partial class DatabaseLibraryManagerContentForm : Form, IContentForm
                             criteriaField.TextValue = textBox.Text;
                         }
                     }
-
                     _currentQuery.CriteriaFields.Add(criteriaField);
                 }
             }
@@ -1228,263 +1345,18 @@ public partial class DatabaseLibraryManagerContentForm : Form, IContentForm
 
     private void CreateCriteriaFieldPanel(TableMetadata table, FieldMetadata field)
     {
-        var fieldPanel = new RoundedPanel
-        {
-            Width = _criteriaPanel.ClientSize.Width - 20,
-            Height = 35,
-            BackColor = Color.FromArgb(250, 250, 250),
-            Margin = new Padding(5, 2, 5, 2),
-            BorderColor = Color.FromArgb(220, 220, 220),
-            BorderRadius = 8,
-            Tag = new { Table = table, Field = field }
-        };
-
-        // Remove button (subtle gray circle with ×)
-        var removeButton = new Button
-        {
-            Text = "×",
-            Font = new Font("Segoe UI", 10f, FontStyle.Regular),
-            ForeColor = Color.FromArgb(150, 150, 150),
-            BackColor = Color.FromArgb(240, 240, 240),
-            FlatStyle = FlatStyle.Flat,
-            Size = new Size(22, 22),
-            Location = new Point(5, 6),
-            Cursor = Cursors.Hand
-        };
-        removeButton.FlatAppearance.BorderSize = 0;
-        removeButton.FlatAppearance.MouseOverBackColor = Color.FromArgb(255, 200, 200);
-        removeButton.FlatAppearance.MouseDownBackColor = Color.FromArgb(255, 150, 150);
-        removeButton.Click += (s, e) => _criteriaPanel.Controls.Remove(fieldPanel);
-        fieldPanel.Controls.Add(removeButton);
-
-        // Field name label
-        var fieldLabel = new Label
-        {
-            Text = $"{table.TableName}.{field.FieldName}",
-            Font = new Font("Segoe UI", 9f, FontStyle.Bold),
-            ForeColor = Color.FromArgb(60, 60, 60),
-            Location = new Point(35, 8),
-            AutoSize = true
-        };
-        fieldPanel.Controls.Add(fieldLabel);
-
-        // Check if field has unique values
-        if (field.UniqueValues != null && field.UniqueValues.Count > 0 && !field.HasMoreThan200UniqueValues)
-        {
-            // Create multi-select listbox with resize capability
-            var listBox = new CheckedListBox
-            {
-                Location = new Point(250, 5),
-                Size = new Size(fieldPanel.Width - 260, 70),
-                BackColor = Color.White,
-                ForeColor = Color.Black,
-                BorderStyle = BorderStyle.FixedSingle,
-                CheckOnClick = true,
-                IntegralHeight = false,
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom
-            };
-
-            // Add "(none)" option
-            listBox.Items.Add("(none)", false);
-
-            // Add unique values
-            foreach (var value in field.UniqueValues)
-            {
-                listBox.Items.Add(value, false);
-            }
-
-            fieldPanel.Height = 80;
-            fieldPanel.Controls.Add(listBox);
-
-            // Add resize grip at bottom-right corner of list box
-            var resizeGrip = new Label
-            {
-                Text = "⋮⋮",
-                Font = new Font("Segoe UI", 8f, FontStyle.Bold),
-                ForeColor = Color.Gray,
-                Size = new Size(20, 15),
-                Location = new Point(listBox.Right - 20, fieldPanel.Height - 18),
-                Cursor = Cursors.SizeNS,
-                BackColor = Color.Transparent,
-                Anchor = AnchorStyles.Bottom | AnchorStyles.Right
-            };
-            
-            // Mouse events for resizing
-            bool isResizing = false;
-            int startY = 0;
-            int startHeight = 0;
-
-            resizeGrip.MouseDown += (s, e) =>
-            {
-                isResizing = true;
-                startY = Cursor.Position.Y;
-                startHeight = fieldPanel.Height;
-            };
-
-            resizeGrip.MouseMove += (s, e) =>
-            {
-                if (isResizing)
-                {
-                    int deltaY = Cursor.Position.Y - startY;
-                    int newHeight = Math.Max(80, startHeight + deltaY);
-                    fieldPanel.Height = newHeight;
-                    listBox.Height = newHeight - 10;
-                }
-            };
-
-            resizeGrip.MouseUp += (s, e) =>
-            {
-                isResizing = false;
-            };
-
-            fieldPanel.Controls.Add(resizeGrip);
-        }
-        else
-        {
-            // Create regular textbox
-            var textBox = new TextBox
-            {
-                Location = new Point(250, 7),
-                Size = new Size(fieldPanel.Width - 260, 23),
-                BackColor = Color.White,
-                ForeColor = Color.Black,
-                BorderStyle = BorderStyle.FixedSingle,
-                Font = new Font("Segoe UI", 9f)
-            };
-            fieldPanel.Controls.Add(textBox);
-        }
-
-        _criteriaPanel.Controls.Add(fieldPanel);
+        var fieldControl = new CriteriaFieldControl(_criteriaPanel, table, field);
+        fieldControl.RemoveRequested += (s, e) => _criteriaPanel.Controls.Remove(fieldControl);
+        fieldControl.UserResizeCompleted += (s, e) => SnapshotQueryToSessionCache();
+        _criteriaPanel.Controls.Add(fieldControl);
     }
 
     private RoundedPanel CreateCriteriaFieldPanelFromSaved(TableMetadata table, FieldMetadata field, QueryCriteriaField savedField)
     {
-        var fieldPanel = new RoundedPanel
-        {
-            Width = _criteriaPanel.ClientSize.Width - 20,
-            Height = savedField.PanelHeight,
-            BackColor = Color.FromArgb(250, 250, 250),
-            Margin = new Padding(5, 2, 5, 2),
-            BorderColor = Color.FromArgb(220, 220, 220),
-            BorderRadius = 8,
-            Tag = new { Table = table, Field = field }
-        };
-
-        // Remove button
-        var removeButton = new Button
-        {
-            Text = "×",
-            Font = new Font("Segoe UI", 10f, FontStyle.Regular),
-            ForeColor = Color.FromArgb(150, 150, 150),
-            BackColor = Color.FromArgb(240, 240, 240),
-            FlatStyle = FlatStyle.Flat,
-            Size = new Size(22, 22),
-            Location = new Point(5, 6),
-            Cursor = Cursors.Hand
-        };
-        removeButton.FlatAppearance.BorderSize = 0;
-        removeButton.FlatAppearance.MouseOverBackColor = Color.FromArgb(255, 200, 200);
-        removeButton.FlatAppearance.MouseDownBackColor = Color.FromArgb(255, 150, 150);
-        removeButton.Click += (s, e) => _criteriaPanel.Controls.Remove(fieldPanel);
-        fieldPanel.Controls.Add(removeButton);
-
-        // Field name label
-        var fieldLabel = new Label
-        {
-            Text = $"{table.TableName}.{field.FieldName}",
-            Font = new Font("Segoe UI", 9f, FontStyle.Bold),
-            ForeColor = Color.FromArgb(60, 60, 60),
-            Location = new Point(35, 8),
-            AutoSize = true
-        };
-        fieldPanel.Controls.Add(fieldLabel);
-
-        // Restore the control based on saved data
-        if (savedField.HasListBox && field.UniqueValues != null && field.UniqueValues.Count > 0)
-        {
-            var listBox = new CheckedListBox
-            {
-                Location = new Point(250, 5),
-                Size = new Size(fieldPanel.Width - 260, fieldPanel.Height - 10),
-                BackColor = Color.White,
-                ForeColor = Color.Black,
-                BorderStyle = BorderStyle.FixedSingle,
-                CheckOnClick = true,
-                IntegralHeight = false,
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom
-            };
-
-            // Add "(none)" option
-            listBox.Items.Add("(none)", savedField.SelectedValues.Contains("(none)"));
-
-            // Add unique values and restore selections
-            foreach (var value in field.UniqueValues)
-            {
-                bool isChecked = savedField.SelectedValues.Contains(value);
-                listBox.Items.Add(value, isChecked);
-            }
-
-            fieldPanel.Controls.Add(listBox);
-
-            // Add resize grip
-            var resizeGrip = new Label
-            {
-                Text = "⋮⋮",
-                Font = new Font("Segoe UI", 8f, FontStyle.Bold),
-                ForeColor = Color.Gray,
-                Size = new Size(20, 15),
-                Location = new Point(listBox.Right - 20, fieldPanel.Height - 18),
-                Cursor = Cursors.SizeNS,
-                BackColor = Color.Transparent,
-                Anchor = AnchorStyles.Bottom | AnchorStyles.Right
-            };
-            
-            bool isResizing = false;
-            int startY = 0;
-            int startHeight = 0;
-
-            resizeGrip.MouseDown += (s, e) =>
-            {
-                isResizing = true;
-                startY = Cursor.Position.Y;
-                startHeight = fieldPanel.Height;
-            };
-
-            resizeGrip.MouseMove += (s, e) =>
-            {
-                if (isResizing)
-                {
-                    int deltaY = Cursor.Position.Y - startY;
-                    int newHeight = Math.Max(80, startHeight + deltaY);
-                    fieldPanel.Height = newHeight;
-                    listBox.Height = newHeight - 10;
-                }
-            };
-
-            resizeGrip.MouseUp += (s, e) =>
-            {
-                isResizing = false;
-            };
-
-            fieldPanel.Controls.Add(resizeGrip);
-        }
-        else
-        {
-            // Restore textbox with saved value
-            var textBox = new TextBox
-            {
-                Location = new Point(250, 7),
-                Size = new Size(fieldPanel.Width - 260, 23),
-                BackColor = Color.White,
-                ForeColor = Color.Black,
-                BorderStyle = BorderStyle.FixedSingle,
-                Font = new Font("Segoe UI", 9f),
-                Text = savedField.TextValue
-            };
-            fieldPanel.Controls.Add(textBox);
-        }
-
-        return fieldPanel;
+        var fieldControl = new CriteriaFieldControl(_criteriaPanel, table, field, savedField);
+        fieldControl.RemoveRequested += (s, e) => _criteriaPanel.Controls.Remove(fieldControl);
+        fieldControl.UserResizeCompleted += (s, e) => SnapshotQueryToSessionCache();
+        return fieldControl;
     }
 
     private void CreateDisplayFieldPanel(TableMetadata table, FieldMetadata field)
