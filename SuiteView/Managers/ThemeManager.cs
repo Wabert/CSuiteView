@@ -22,7 +22,8 @@ public class ThemeManager
             secondary: ColorTranslator.FromHtml("#3a71c5"),    // Rich walnut
             accent: ColorTranslator.FromHtml("#FFD700"),       // Lustrous brass/gold
             textOnPrimary: ColorTranslator.FromHtml("#FFFFFF"), // White text on blue
-            textOnSecondary: ColorTranslator.FromHtml("#D4AF37") // Brass text on walnut
+            textOnSecondary: ColorTranslator.FromHtml("#D4AF37"), // Brass text on walnut
+            lightBlue: ColorTranslator.FromHtml("#60a0ff")     // Life blue for tree views (closer to primary)
         );
 
         // Theme 2: Navy Blue - Deep navy with walnut and bright brass
@@ -32,7 +33,8 @@ public class ThemeManager
             secondary: ColorTranslator.FromHtml("#6B4423"),    // Rich walnut
             accent: ColorTranslator.FromHtml("#E8C547"),       // Bright brass
             textOnPrimary: ColorTranslator.FromHtml("#E8C547"), // Brass text on navy
-            textOnSecondary: ColorTranslator.FromHtml("#E8C547") // Brass text on walnut
+            textOnSecondary: ColorTranslator.FromHtml("#E8C547"), // Brass text on walnut
+            lightBlue: ColorTranslator.FromHtml("#2E5A7F")     // Darker blue for tree views (closer to primary)
         );
 
         // Theme 3: Sapphire - Bright sapphire blue with walnut and gold
@@ -42,7 +44,8 @@ public class ThemeManager
             secondary: ColorTranslator.FromHtml("#6B4423"),    // Rich walnut
             accent: ColorTranslator.FromHtml("#FFD700"),       // Pure gold
             textOnPrimary: ColorTranslator.FromHtml("#FFD700"), // Gold text on blue
-            textOnSecondary: ColorTranslator.FromHtml("#FFD700") // Gold text on walnut
+            textOnSecondary: ColorTranslator.FromHtml("#FFD700"), // Gold text on walnut
+            lightBlue: ColorTranslator.FromHtml("#2F6FCA")     // Darker blue for tree views (closer to primary)
         );
 
         // Theme 4: Midnight - Midnight blue with walnut and antique brass
@@ -52,7 +55,8 @@ public class ThemeManager
             secondary: ColorTranslator.FromHtml("#6B4423"),    // Rich walnut
             accent: ColorTranslator.FromHtml("#C9A961"),       // Antique brass
             textOnPrimary: ColorTranslator.FromHtml("#C9A961"), // Brass text on blue
-            textOnSecondary: ColorTranslator.FromHtml("#C9A961") // Brass text on walnut
+            textOnSecondary: ColorTranslator.FromHtml("#C9A961"), // Brass text on walnut
+            lightBlue: ColorTranslator.FromHtml("#1A4D7F")     // Darker blue for tree views (closer to primary)
         );
 
         // Theme 5: Azure - Azure blue with walnut and bronze
@@ -62,7 +66,8 @@ public class ThemeManager
             secondary: ColorTranslator.FromHtml("#6B4423"),    // Rich walnut
             accent: ColorTranslator.FromHtml("#CD7F32"),       // Bronze
             textOnPrimary: ColorTranslator.FromHtml("#FFFFFF"), // White text on blue
-            textOnSecondary: ColorTranslator.FromHtml("#CD7F32") // Bronze text on walnut
+            textOnSecondary: ColorTranslator.FromHtml("#CD7F32"), // Bronze text on walnut
+            lightBlue: ColorTranslator.FromHtml("#5A86E8")     // Darker blue for tree views (closer to primary)
         );
     }
 

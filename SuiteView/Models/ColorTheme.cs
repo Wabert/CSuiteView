@@ -35,11 +35,16 @@ public class ColorTheme
     /// </summary>
     public Color TextOnSecondary { get; set; }
 
+    /// <summary>
+    /// Light blue color for tree view backgrounds
+    /// </summary>
+    public Color LightBlue { get; set; }
+
     public ColorTheme()
     {
     }
 
-    public ColorTheme(string name, Color primary, Color secondary, Color accent, Color textOnPrimary, Color textOnSecondary)
+    public ColorTheme(string name, Color primary, Color secondary, Color accent, Color textOnPrimary, Color textOnSecondary, Color lightBlue)
     {
         Name = name;
         Primary = primary;
@@ -47,5 +52,6 @@ public class ColorTheme
         Accent = accent;
         TextOnPrimary = textOnPrimary;
         TextOnSecondary = textOnSecondary;
+        LightBlue = lightBlue;
     }
 }

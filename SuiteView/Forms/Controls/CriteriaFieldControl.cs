@@ -29,6 +29,7 @@ namespace SuiteView.Forms.Controls
 
     public event EventHandler? RemoveRequested;
     public event EventHandler? UserResizeCompleted;
+    public event EventHandler? ValueChanged;
 
         public CriteriaFieldControl(FlowLayoutPanel parentFlow, TableMetadata table, FieldMetadata field, QueryCriteriaField? saved = null)
         {
@@ -97,6 +98,7 @@ namespace SuiteView.Forms.Controls
                 };
                 OperatorCombo.Items.AddRange(new object[] { "none", "equals", "contains", "begins with", "ends with" });
                 OperatorCombo.SelectedIndex = 0;
+                OperatorCombo.SelectedIndexChanged += (s, e) => ValueChanged?.Invoke(this, EventArgs.Empty);
                 Controls.Add(OperatorCombo);
                 contentLeft += 170;
             }
@@ -126,6 +128,7 @@ namespace SuiteView.Forms.Controls
                     bool isChecked = saved?.SelectedValues?.Contains(v) == true;
                     ValuesListBox.Items.Add(v, isChecked);
                 }
+                ValuesListBox.ItemCheck += (s, e) => ValueChanged?.Invoke(this, EventArgs.Empty);
                 Controls.Add(ValuesListBox);
 
                 AddResizeStrip();
@@ -142,6 +145,7 @@ namespace SuiteView.Forms.Controls
                     Font = new Font("Segoe UI", 9f),
                     Text = saved?.TextValue ?? string.Empty
                 };
+                ValueTextBox.TextChanged += (s, e) => ValueChanged?.Invoke(this, EventArgs.Empty);
                 Controls.Add(ValueTextBox);
                 // Still add strip to make height adjustable for future
                 AddResizeStrip();

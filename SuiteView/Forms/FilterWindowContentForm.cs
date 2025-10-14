@@ -19,6 +19,8 @@ public class FilterWindowContentForm : Form, IContentForm
     private Button _applyButton = null!;
     private Button _clearButton = null!;
     private Label _infoLabel = null!;
+    private TextBox _searchTextBox = null!;
+    private Label _searchLabel = null!;
 
     private const int TitleBarHeight = 35;
     private const int ControlMargin = 10;
@@ -33,6 +35,8 @@ public class FilterWindowContentForm : Form, IContentForm
     private readonly string _columnName;
     private readonly HashSet<string> _allValues;
     private readonly HashSet<string>? _currentSelection;
+    private List<string> _sortedValues = new();
+    private Dictionary<int, bool> _checkedStates = new();
 
     public FilterWindowContentForm(ColorTheme theme, string columnName, HashSet<string> allValues, HashSet<string>? currentSelection)
     {
@@ -110,11 +114,28 @@ public class FilterWindowContentForm : Form, IContentForm
             BackColor = Color.Transparent
         };
 
+        // Search label
+        _searchLabel = new Label
+        {
+            Text = "Search:",
+            AutoSize = true,
+            ForeColor = Color.White,
+            Font = new Font("Segoe UI", 9f),
+            BackColor = Color.Transparent
+        };
+
+        // Search textbox
+        _searchTextBox = new TextBox
+        {
+            Font = new Font("Segoe UI", 9f),
+            BorderStyle = BorderStyle.FixedSingle
+        };
+        _searchTextBox.TextChanged += SearchTextBox_TextChanged;
+
         // Select All checkbox
         _selectAllCheckBox = new CheckBox
         {
             Text = "(Select All)",
-            Location = new Point(ControlMargin, _infoLabel.Bottom + 5),
             AutoSize = true,
             ForeColor = Color.White,
             Font = new Font("Segoe UI", 9f, FontStyle.Bold),
@@ -143,6 +164,7 @@ public class FilterWindowContentForm : Form, IContentForm
             IntegralHeight = false,
             Font = new Font("Segoe UI", 9f)
         };
+        _valuesListBox.ItemCheck += ValuesListBox_ItemCheck;
 
         // Apply button
         _applyButton = new Button
@@ -168,6 +190,8 @@ public class FilterWindowContentForm : Form, IContentForm
 
         // Add controls
         _contentPanel.Controls.Add(_infoLabel);
+        _contentPanel.Controls.Add(_searchLabel);
+        _contentPanel.Controls.Add(_searchTextBox);
         _contentPanel.Controls.Add(_selectAllCheckBox);
         _contentPanel.Controls.Add(_deselectAllCheckBox);
         _contentPanel.Controls.Add(_valuesListBox);
@@ -203,11 +227,19 @@ public class FilterWindowContentForm : Form, IContentForm
         
         // Update info label
         _infoLabel.MaximumSize = new Size(availableWidth, 0);
-        _infoLabel.Text = $"Showing {Math.Min(_allValues.Count, 1000):N0} of {_allValues.Count:N0} values";
+        int filteredCount = string.IsNullOrWhiteSpace(_searchTextBox?.Text) 
+            ? _allValues.Count 
+            : _valuesListBox.Items.Count;
+        _infoLabel.Text = $"Showing {Math.Min(filteredCount, 1000):N0} of {_allValues.Count:N0} values";
+
+        // Position search controls
+        _searchLabel!.Location = new Point(ControlMargin, _infoLabel.Bottom + 8);
+        _searchTextBox!.Location = new Point(_searchLabel.Right + 5, _infoLabel.Bottom + 5);
+        _searchTextBox.Width = availableWidth - _searchLabel.Width - 5;
 
         // Position checkboxes side by side
-        _selectAllCheckBox.Location = new Point(ControlMargin, _infoLabel.Bottom + 5);
-        _deselectAllCheckBox.Location = new Point(_selectAllCheckBox.Right + 15, _infoLabel.Bottom + 5);
+        _selectAllCheckBox.Location = new Point(ControlMargin, _searchTextBox.Bottom + 8);
+        _deselectAllCheckBox.Location = new Point(_selectAllCheckBox.Right + 15, _searchTextBox.Bottom + 8);
 
         // Update list box size
         int listBoxTop = _selectAllCheckBox.Bottom + 5;
@@ -231,6 +263,9 @@ public class FilterWindowContentForm : Form, IContentForm
         _titleLabel.ForeColor = _currentTheme.Accent;
         _contentPanel.BackColor = _currentTheme.Secondary;
 
+        _searchTextBox.BackColor = ControlPaint.Light(_currentTheme.LightBlue, 0.1f);
+        _searchTextBox.ForeColor = Color.White;
+
         _valuesListBox.BackColor = ControlPaint.Light(_currentTheme.Secondary, 0.1f);
         _valuesListBox.ForeColor = Color.White;
 
@@ -245,30 +280,97 @@ public class FilterWindowContentForm : Form, IContentForm
 
     private void LoadValues()
     {
-        // Load values (limited to 1000 for performance)
-        var sortedValues = _allValues.OrderBy(v => v).Take(1000).ToList();
+        // Load values (limited to 1000 for performance) and store them
+        _sortedValues = _allValues.OrderBy(v => v).Take(1000).ToList();
 
+        // Initialize checked states based on current selection
+        _checkedStates.Clear();
+        for (int i = 0; i < _sortedValues.Count; i++)
+        {
+            _checkedStates[i] = _currentSelection == null || _currentSelection.Contains(_sortedValues[i]);
+        }
+
+        // Display all values initially
+        RefreshListBox(string.Empty);
+    }
+
+    private void RefreshListBox(string searchText)
+    {
         _valuesListBox.BeginUpdate();
         _valuesListBox.Items.Clear();
 
-        foreach (var value in sortedValues)
+        for (int i = 0; i < _sortedValues.Count; i++)
         {
+            string value = _sortedValues[i];
+            
+            // Filter based on search text
+            if (!string.IsNullOrWhiteSpace(searchText) && 
+                !value.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
             string displayText = string.IsNullOrEmpty(value) ? "(Blank)" : value;
             if (displayText.Length > 100)
             {
                 displayText = displayText.Substring(0, 97) + "...";
             }
 
-            int index = _valuesListBox.Items.Add(displayText);
+            int displayIndex = _valuesListBox.Items.Add(displayText);
             
-            // Set checked state based on current selection
-            if (_currentSelection == null || _currentSelection.Contains(value))
-            {
-                _valuesListBox.SetItemChecked(index, true);
-            }
+            // Store the original index in the Tag so we can track checked state
+            _valuesListBox.Items[displayIndex] = new ListBoxItem(displayText, i);
+            
+            // Restore checked state
+            _valuesListBox.SetItemChecked(displayIndex, _checkedStates[i]);
         }
 
         _valuesListBox.EndUpdate();
+        UpdateLayout();
+    }
+
+    private class ListBoxItem
+    {
+        public string DisplayText { get; }
+        public int OriginalIndex { get; }
+
+        public ListBoxItem(string displayText, int originalIndex)
+        {
+            DisplayText = displayText;
+            OriginalIndex = originalIndex;
+        }
+
+        public override string ToString() => DisplayText;
+    }
+
+    private void SearchTextBox_TextChanged(object? sender, EventArgs e)
+    {
+        // Save current checked states before refreshing
+        SaveCheckedStates();
+        
+        // Refresh the list with the search filter
+        RefreshListBox(_searchTextBox.Text);
+    }
+
+    private void ValuesListBox_ItemCheck(object? sender, ItemCheckEventArgs e)
+    {
+        // Update the checked state when an item is checked/unchecked
+        if (_valuesListBox.Items[e.Index] is ListBoxItem item)
+        {
+            _checkedStates[item.OriginalIndex] = e.NewValue == CheckState.Checked;
+        }
+    }
+
+    private void SaveCheckedStates()
+    {
+        // Update the checked states dictionary based on current listbox state
+        for (int i = 0; i < _valuesListBox.Items.Count; i++)
+        {
+            if (_valuesListBox.Items[i] is ListBoxItem item)
+            {
+                _checkedStates[item.OriginalIndex] = _valuesListBox.GetItemChecked(i);
+            }
+        }
     }
 
     private void SelectAllCheckBox_CheckedChanged(object? sender, EventArgs e)
@@ -280,10 +382,14 @@ public class FilterWindowContentForm : Form, IContentForm
             _deselectAllCheckBox.Checked = false;
             _deselectAllCheckBox.CheckedChanged += DeselectAllCheckBox_CheckedChanged;
 
-            // Check all items
+            // Check all VISIBLE items and update their states
             for (int i = 0; i < _valuesListBox.Items.Count; i++)
             {
                 _valuesListBox.SetItemChecked(i, true);
+                if (_valuesListBox.Items[i] is ListBoxItem item)
+                {
+                    _checkedStates[item.OriginalIndex] = true;
+                }
             }
         }
     }
@@ -297,31 +403,38 @@ public class FilterWindowContentForm : Form, IContentForm
             _selectAllCheckBox.Checked = false;
             _selectAllCheckBox.CheckedChanged += SelectAllCheckBox_CheckedChanged;
 
-            // Uncheck all items
+            // Uncheck all VISIBLE items and update their states
             for (int i = 0; i < _valuesListBox.Items.Count; i++)
             {
                 _valuesListBox.SetItemChecked(i, false);
+                if (_valuesListBox.Items[i] is ListBoxItem item)
+                {
+                    _checkedStates[item.OriginalIndex] = false;
+                }
             }
         }
     }
 
     private void ApplyButton_Click(object? sender, EventArgs e)
     {
-        var selectedValues = new HashSet<string>();
-        var sortedValues = _allValues.OrderBy(v => v).Take(1000).ToList();
+        // Save current visible checked states first
+        SaveCheckedStates();
 
-        for (int i = 0; i < _valuesListBox.Items.Count; i++)
+        // Now collect all checked values from the complete state dictionary
+        var selectedValues = new HashSet<string>();
+
+        for (int i = 0; i < _sortedValues.Count; i++)
         {
-            if (_valuesListBox.GetItemChecked(i))
+            if (_checkedStates[i])
             {
-                selectedValues.Add(sortedValues[i]);
+                selectedValues.Add(_sortedValues[i]);
             }
         }
 
         // If no items are selected, treat as clearing the filter (show all)
-        // If all AVAILABLE items are selected, treat as no filter
+        // If all items are selected, treat as no filter
         // Otherwise, apply the filter with the selected values
-        if (selectedValues.Count == 0 || selectedValues.Count == _valuesListBox.Items.Count)
+        if (selectedValues.Count == 0 || selectedValues.Count == _sortedValues.Count)
         {
             // No filter - show all values
             FilterApplied?.Invoke(this, new FilterAppliedEventArgs(_columnName, null));

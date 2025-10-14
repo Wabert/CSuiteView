@@ -54,10 +54,12 @@ public class DatabaseLibraryConfig
 public class QueryDefinition
 {
     public string Name { get; set; } = string.Empty;
+    public string DataSourceName { get; set; } = string.Empty;  // Which database this query runs against
     public DateTime CreatedDate { get; set; }
     public DateTime LastModifiedDate { get; set; }
     public List<QueryCriteriaField> CriteriaFields { get; set; } = new();
     public List<QueryDisplayField> DisplayFields { get; set; } = new();
+    public List<QueryJoin> Joins { get; set; } = new();
 }
 
 /// <summary>
@@ -84,4 +86,24 @@ public class QueryDisplayField
     public string TableName { get; set; } = string.Empty;
     public string FieldName { get; set; } = string.Empty;
     public string DataType { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Represents a table join in the query
+/// </summary>
+public class QueryJoin
+{
+    public string LeftTable { get; set; } = string.Empty;
+    public string JoinType { get; set; } = "INNER JOIN";
+    public string RightTable { get; set; } = string.Empty;
+    public List<QueryJoinCondition> Conditions { get; set; } = new();
+}
+
+/// <summary>
+/// Represents a single ON condition in a join
+/// </summary>
+public class QueryJoinCondition
+{
+    public string LeftField { get; set; } = string.Empty;
+    public string RightField { get; set; } = string.Empty;
 }
