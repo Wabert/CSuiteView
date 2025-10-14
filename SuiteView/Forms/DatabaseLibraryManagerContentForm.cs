@@ -741,13 +741,12 @@ public partial class DatabaseLibraryManagerContentForm : Form, IContentForm
         _tablesListView.Location = new Point(rightPanelX, tablesListY);
         _tablesListView.Size = new Size(rightPanelWidth, rightPanelHeight - _addTablesButton.Height - 5);
 
-        // Fields ListView (on the right when showing fields)
-        // Button and label area at top
+        // Fields ListView
         int fieldsListViewY = ControlMargin + 35;
         _fieldsListView.Location = new Point(rightPanelX, fieldsListViewY);
         _fieldsListView.Size = new Size(rightPanelWidth, rightPanelHeight - 35);
 
-        // Table Name Label (top left of right panel when showing fields)
+        // Table Name Label (top left when showing fields)
         _tableNameLabel.Location = new Point(rightPanelX, ControlMargin + 5);
 
         // Export Fields button (top right, first button)
@@ -1304,10 +1303,27 @@ public partial class DatabaseLibraryManagerContentForm : Form, IContentForm
                 TableMetadata table = tagData.Table;
                 FieldMetadata field = tagData.Field;
 
+                // Find which database this table belongs to
+                DatabaseConfig? database = null;
+                foreach (var db in _config.Databases)
+                {
+                    if (db.Tables.Any(t => t.TableName == table.TableName))
+                    {
+                        database = db;
+                        break;
+                    }
+                }
+
+                if (database == null)
+                {
+                    MessageBox.Show($"Could not find database configuration for table: {table.TableName}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    continue;
+                }
+
                 // Get unique values from database
                 var (uniqueValues, hasMoreThan200, totalCount) = await DatabaseService.GetUniqueValuesAsync(
-                    "UL_Rates", 
-                    "UL_Rates", 
+                    database.OdbcDsn, 
+                    database.DatabaseName, 
                     table.TableName, 
                     field.FieldName
                 );

@@ -87,59 +87,61 @@ public class DatabaseService
             using var connection = new OdbcConnection(connectionString);
             connection.Open();
             
-            try
+            // Check if this is DB2 (NEON_DSN) - if so, use WITH clause approach first
+            if (odbcDsn.Equals("NEON_DSN", StringComparison.OrdinalIgnoreCase))
             {
-                // Approach 1: Get column schema information using ODBC schema
-                DataTable schemaTable = connection.GetSchema("Columns", new[] { null, null, tableName, null });
+                // DB2: Use WITH clause approach with DB2TAB.LH_COV_PHA (known working table)
+                string withQuery = $"WITH DUMBY AS (SELECT 1 FROM DB2TAB.LH_COV_PHA) SELECT * FROM {tableName} FETCH FIRST 1 ROW ONLY";
                 
-                foreach (DataRow row in schemaTable.Rows)
+                using var command = new OdbcCommand(withQuery, connection);
+                using var reader = command.ExecuteReader(System.Data.CommandBehavior.SchemaOnly);
+                var querySchemaTable = reader.GetSchemaTable();
+                
+                if (querySchemaTable != null)
                 {
-                    var field = new FieldMetadata
+                    foreach (DataRow row in querySchemaTable.Rows)
                     {
-                        FieldName = row["COLUMN_NAME"]?.ToString() ?? string.Empty,
-                        DataType = row["DATA_TYPE"]?.ToString() ?? string.Empty,
-                        MaxLength = row["COLUMN_SIZE"] != DBNull.Value ? Convert.ToInt32(row["COLUMN_SIZE"]) : null,
-                        IsNullable = row["IS_NULLABLE"]?.ToString()?.Equals("YES", StringComparison.OrdinalIgnoreCase) ?? false
-                    };
-                    
-                    fields.Add(field);
-                }
-                
-                if (fields.Count == 0)
-                {
-                    throw new Exception("Schema approach returned no columns");
-                }
-            }
-            catch (Exception)
-            {
-                // Approach 2: Try WITH clause for DB2 compatibility using DB2TAB.LH_COV_PHA (known working table)
-                string withQuery = $"WITH DUMMY AS (SELECT 1 FROM DB2TAB.LH_COV_PHA) SELECT * FROM {tableName} FETCH FIRST 1 ROW ONLY";
-                
-                try
-                {
-                    using var command = new OdbcCommand(withQuery, connection);
-                    using var reader = command.ExecuteReader(System.Data.CommandBehavior.SchemaOnly);
-                    var querySchemaTable = reader.GetSchemaTable();
-                    
-                    if (querySchemaTable != null)
-                    {
-                        foreach (DataRow row in querySchemaTable.Rows)
+                        var field = new FieldMetadata
                         {
-                            var field = new FieldMetadata
-                            {
-                                FieldName = row["ColumnName"]?.ToString() ?? string.Empty,
-                                DataType = row["DataTypeName"]?.ToString() ?? string.Empty,
-                                MaxLength = row["ColumnSize"] != DBNull.Value ? Convert.ToInt32(row["ColumnSize"]) : null,
-                                IsNullable = row["AllowDBNull"] != DBNull.Value && Convert.ToBoolean(row["AllowDBNull"])
-                            };
-                            
-                            fields.Add(field);
-                        }
+                            FieldName = row["ColumnName"]?.ToString() ?? string.Empty,
+                            DataType = row["DataType"]?.ToString() ?? string.Empty,
+                            MaxLength = row["ColumnSize"] != DBNull.Value ? Convert.ToInt32(row["ColumnSize"]) : null,
+                            IsNullable = row["AllowDBNull"] != DBNull.Value && Convert.ToBoolean(row["AllowDBNull"])
+                        };
+                        
+                        fields.Add(field);
                     }
                 }
-                catch
+            }
+            else
+            {
+                // SQL Server or other: Use schema approach first
+                try
                 {
-                    // Approach 3: Try without WITH clause
+                    // Approach 1: Get column schema information using ODBC schema
+                    DataTable schemaTable = connection.GetSchema("Columns", new[] { null, null, tableName, null });
+                    
+                    foreach (DataRow row in schemaTable.Rows)
+                    {
+                        var field = new FieldMetadata
+                        {
+                            FieldName = row["COLUMN_NAME"]?.ToString() ?? string.Empty,
+                            DataType = row["DATA_TYPE"]?.ToString() ?? string.Empty,
+                            MaxLength = row["COLUMN_SIZE"] != DBNull.Value ? Convert.ToInt32(row["COLUMN_SIZE"]) : null,
+                            IsNullable = row["IS_NULLABLE"]?.ToString()?.Equals("YES", StringComparison.OrdinalIgnoreCase) ?? false
+                        };
+                        
+                        fields.Add(field);
+                    }
+                    
+                    if (fields.Count == 0)
+                    {
+                        throw new Exception("Schema approach returned no columns");
+                    }
+                }
+                catch (Exception)
+                {
+                    // Fallback: Try simple query approach
                     string simpleQuery = $"SELECT * FROM {tableName} FETCH FIRST 1 ROW ONLY";
                     
                     try
@@ -155,7 +157,7 @@ public class DatabaseService
                                 var field = new FieldMetadata
                                 {
                                     FieldName = row["ColumnName"]?.ToString() ?? string.Empty,
-                                    DataType = row["DataTypeName"]?.ToString() ?? string.Empty,
+                                    DataType = row["DataType"]?.ToString() ?? string.Empty,
                                     MaxLength = row["ColumnSize"] != DBNull.Value ? Convert.ToInt32(row["ColumnSize"]) : null,
                                     IsNullable = row["AllowDBNull"] != DBNull.Value && Convert.ToBoolean(row["AllowDBNull"])
                                 };
@@ -223,8 +225,17 @@ public class DatabaseService
             using var connection = new OdbcConnection(connectionString);
             connection.Open();
             
+            // Check if this is DB2 (NEON_DSN) - if so, use WITH clause
+            bool isDB2 = odbcDsn.Equals("NEON_DSN", StringComparison.OrdinalIgnoreCase);
+            string withClause = isDB2 ? "WITH DUMBY AS (SELECT 1 FROM DB2TAB.LH_COV_PHA) " : "";
+            
+            // For DB2, ensure proper table name format (no brackets)
+            // For SQL Server, use brackets
+            string formattedTableName = isDB2 ? tableName : $"[{tableName}]";
+            string formattedFieldName = isDB2 ? fieldName : $"[{fieldName}]";
+            
             // First, count the unique values
-            string countQuery = $"SELECT COUNT(DISTINCT [{fieldName}]) FROM [{tableName}]";
+            string countQuery = $"{withClause}SELECT COUNT(DISTINCT {formattedFieldName}) FROM {formattedTableName}";
             using var countCommand = new OdbcCommand(countQuery, connection);
             totalCount = Convert.ToInt32(countCommand.ExecuteScalar());
             
@@ -235,7 +246,7 @@ public class DatabaseService
             else
             {
                 // Get the actual unique values
-                string query = $"SELECT DISTINCT [{fieldName}] FROM [{tableName}] ORDER BY [{fieldName}]";
+                string query = $"{withClause}SELECT DISTINCT {formattedFieldName} FROM {formattedTableName} ORDER BY {formattedFieldName}";
                 using var command = new OdbcCommand(query, connection);
                 using var reader = command.ExecuteReader();
                 
