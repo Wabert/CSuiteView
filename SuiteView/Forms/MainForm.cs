@@ -21,6 +21,7 @@ public partial class MainForm : Form
     private Button _snapButton = null!;
     private Button _scanDirButton = null!;
     private Button _dbLibraryButton = null!;
+    private Button _threePanelButton = null!;
     private Form? _parentBorderForm;
     private WordDocumentManager? _wordDocManager;
 
@@ -142,9 +143,26 @@ public partial class MainForm : Form
         _dbLibraryButton.FlatAppearance.MouseOverBackColor = Color.Transparent;
         _dbLibraryButton.Click += DbLibraryButton_Click;
 
+        // Three Panel button (transparent - will be drawn as round in Paint)
+        _threePanelButton = new Button
+        {
+            Text = "",
+            Size = new Size(120, 32),
+            Location = new Point(20, 155), // Will be adjusted in UpdateLayout
+            FlatStyle = FlatStyle.Flat,
+            BackColor = Color.Transparent,
+            Cursor = Cursors.Hand,
+            TabStop = false
+        };
+        _threePanelButton.FlatAppearance.BorderSize = 0;
+        _threePanelButton.FlatAppearance.MouseDownBackColor = Color.Transparent;
+        _threePanelButton.FlatAppearance.MouseOverBackColor = Color.Transparent;
+        _threePanelButton.Click += ThreePanelButton_Click;
+
         _contentPanel.Controls.Add(_snapButton);
         _contentPanel.Controls.Add(_scanDirButton);
         _contentPanel.Controls.Add(_dbLibraryButton);
+        _contentPanel.Controls.Add(_threePanelButton);
 
         this.Controls.Add(_contentPanel);
         this.Controls.Add(_titleLabel);
@@ -185,6 +203,9 @@ public partial class MainForm : Form
         
         // Position DB library button below scan directory button
         _dbLibraryButton.Location = new Point(20, 110);
+        
+        // Position three panel button below DB library button
+        _threePanelButton.Location = new Point(20, 155);
     }
 
     private void ApplyTheme()
@@ -299,6 +320,9 @@ public partial class MainForm : Form
         
         // Draw rounded DB library button
         DrawRoundedDbLibraryButton(g);
+        
+        // Draw rounded three panel button
+        DrawRoundedThreePanelButton(g);
     }
 
     private void DrawRoundCloseButton(Graphics g)
@@ -430,6 +454,41 @@ public partial class MainForm : Form
         }
     }
 
+    private void DrawRoundedThreePanelButton(Graphics g)
+    {
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
+        // Button position in content panel coordinates
+        var buttonRect = _threePanelButton.Bounds;
+
+        // Draw rounded brass background
+        const int cornerRadius = 16;
+        using (var path = new System.Drawing.Drawing2D.GraphicsPath())
+        {
+            path.AddArc(buttonRect.X, buttonRect.Y, cornerRadius, cornerRadius, 180, 90);
+            path.AddArc(buttonRect.Right - cornerRadius, buttonRect.Y, cornerRadius, cornerRadius, 270, 90);
+            path.AddArc(buttonRect.Right - cornerRadius, buttonRect.Bottom - cornerRadius, cornerRadius, cornerRadius, 0, 90);
+            path.AddArc(buttonRect.X, buttonRect.Bottom - cornerRadius, cornerRadius, cornerRadius, 90, 90);
+            path.CloseFigure();
+
+            using (var brush = new SolidBrush(_currentTheme.Accent))
+            {
+                g.FillPath(brush, path);
+            }
+        }
+
+        // Draw "3Panel Form" text in blue
+        using (var font = new Font("Segoe UI", 9f, FontStyle.Bold))
+        using (var brush = new SolidBrush(_currentTheme.Primary))
+        {
+            var text = "3Panel Form";
+            var size = g.MeasureString(text, font);
+            var x = buttonRect.X + (buttonRect.Width - size.Width) / 2;
+            var y = buttonRect.Y + (buttonRect.Height - size.Height) / 2;
+            g.DrawString(text, font, brush, x, y);
+        }
+    }
+
     #endregion
 
     #region Button Events
@@ -536,6 +595,131 @@ public partial class MainForm : Form
         {
             MessageBox.Show(
                 $"Error opening Directory Scanner: {ex.Message}",
+                "Error",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
+    }
+
+    private void ThreePanelButton_Click(object? sender, EventArgs e)
+    {
+        try
+        {
+            // Show a menu to select different panel configurations
+            var menu = new ContextMenuStrip();
+            
+            // 1 Panel options
+            menu.Items.Add("1 Panel (Header + Footer)", null, (s, args) => 
+            {
+                var contentForm = new IndependentThreePanelForm(1, true, true, theme: _currentTheme);
+                var borderedWindow = new BorderedWindowForm(_currentTheme, 
+                    initialSize: new Size(1000, 600), 
+                    minimumSize: new Size(300, 200));
+                borderedWindow.Text = "1-Panel Form";
+                borderedWindow.SetContentForm(contentForm);
+                borderedWindow.Show();
+            });
+            menu.Items.Add("1 Panel (No Header/Footer)", null, (s, args) => 
+            {
+                var contentForm = new IndependentThreePanelForm(1, false, false, theme: _currentTheme);
+                var borderedWindow = new BorderedWindowForm(_currentTheme, 
+                    initialSize: new Size(1000, 600), 
+                    minimumSize: new Size(300, 200));
+                borderedWindow.Text = "1-Panel Form";
+                borderedWindow.SetContentForm(contentForm);
+                borderedWindow.Show();
+            });
+            
+            menu.Items.Add(new ToolStripSeparator());
+            
+            // 2 Panel options
+            menu.Items.Add("2 Panels (Header + Footer)", null, (s, args) => 
+            {
+                var contentForm = new IndependentThreePanelForm(2, true, true, theme: _currentTheme);
+                var borderedWindow = new BorderedWindowForm(_currentTheme, 
+                    initialSize: new Size(1000, 600), 
+                    minimumSize: new Size(300, 200));
+                borderedWindow.Text = "2-Panel Form";
+                borderedWindow.SetContentForm(contentForm);
+                borderedWindow.Show();
+            });
+            menu.Items.Add("2 Panels (Header Only)", null, (s, args) => 
+            {
+                var contentForm = new IndependentThreePanelForm(2, true, false, theme: _currentTheme);
+                var borderedWindow = new BorderedWindowForm(_currentTheme, 
+                    initialSize: new Size(1000, 600), 
+                    minimumSize: new Size(300, 200));
+                borderedWindow.Text = "2-Panel Form";
+                borderedWindow.SetContentForm(contentForm);
+                borderedWindow.Show();
+            });
+            
+            menu.Items.Add(new ToolStripSeparator());
+            
+            // 3 Panel options (default)
+            menu.Items.Add("3 Panels (Header + Footer) ⭐", null, (s, args) => 
+            {
+                var contentForm = new IndependentThreePanelForm(3, true, true, theme: _currentTheme);
+                var borderedWindow = new BorderedWindowForm(_currentTheme, 
+                    initialSize: new Size(1200, 700), 
+                    minimumSize: new Size(300, 200));
+                borderedWindow.Text = "3-Panel Form";
+                borderedWindow.SetContentForm(contentForm);
+                borderedWindow.Show();
+            });
+            menu.Items.Add("3 Panels (Footer Only)", null, (s, args) => 
+            {
+                var contentForm = new IndependentThreePanelForm(3, false, true, theme: _currentTheme);
+                var borderedWindow = new BorderedWindowForm(_currentTheme, 
+                    initialSize: new Size(1200, 700), 
+                    minimumSize: new Size(300, 200));
+                borderedWindow.Text = "3-Panel Form";
+                borderedWindow.SetContentForm(contentForm);
+                borderedWindow.Show();
+            });
+            menu.Items.Add("3 Panels (No Header/Footer)", null, (s, args) => 
+            {
+                var contentForm = new IndependentThreePanelForm(3, false, false, theme: _currentTheme);
+                var borderedWindow = new BorderedWindowForm(_currentTheme, 
+                    initialSize: new Size(1200, 700), 
+                    minimumSize: new Size(300, 200));
+                borderedWindow.Text = "3-Panel Form";
+                borderedWindow.SetContentForm(contentForm);
+                borderedWindow.Show();
+            });
+            
+            menu.Items.Add(new ToolStripSeparator());
+            
+            // 4 Panel options
+            menu.Items.Add("4 Panels (Header + Footer)", null, (s, args) => 
+            {
+                var contentForm = new IndependentThreePanelForm(4, true, true, theme: _currentTheme);
+                var borderedWindow = new BorderedWindowForm(_currentTheme, 
+                    initialSize: new Size(1400, 800), 
+                    minimumSize: new Size(300, 200));
+                borderedWindow.Text = "4-Panel Form";
+                borderedWindow.SetContentForm(contentForm);
+                borderedWindow.Show();
+            });
+            menu.Items.Add("4 Panels (No Header/Footer)", null, (s, args) => 
+            {
+                var contentForm = new IndependentThreePanelForm(4, false, false, theme: _currentTheme);
+                var borderedWindow = new BorderedWindowForm(_currentTheme, 
+                    initialSize: new Size(1400, 800), 
+                    minimumSize: new Size(300, 200));
+                borderedWindow.Text = "4-Panel Form";
+                borderedWindow.SetContentForm(contentForm);
+                borderedWindow.Show();
+            });
+            
+            // Show menu at button location
+            var buttonLocation = _threePanelButton.PointToScreen(new Point(0, _threePanelButton.Height));
+            menu.Show(buttonLocation);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"Error opening Independent Panel Form: {ex.Message}",
                 "Error",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
