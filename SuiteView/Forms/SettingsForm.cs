@@ -9,8 +9,8 @@ namespace SuiteView.Forms;
 public class SettingsForm : Form
 {
     private readonly ConfigManager _configManager;
-    private readonly MainForm _mainForm;
-    private readonly ResizableBorderForm _borderForm;
+    private readonly Form _mainForm;
+    private readonly ResizableBorderForm? _borderForm;
 
     private ComboBox _themeComboBox;
     private CheckBox _launchOnStartupCheckBox;
@@ -22,7 +22,7 @@ public class SettingsForm : Form
 
     private ColorTheme _currentTheme;
 
-    public SettingsForm(ConfigManager configManager, MainForm mainForm, ResizableBorderForm borderForm)
+    public SettingsForm(ConfigManager configManager, Form mainForm, ResizableBorderForm? borderForm = null)
     {
         _configManager = configManager;
         _mainForm = mainForm;
@@ -301,7 +301,11 @@ public class SettingsForm : Form
             });
 
             // Apply theme to main form
-            _mainForm.UpdateTheme(selectedTheme);
+            var updateThemeMethod = _mainForm.GetType().GetMethod("UpdateTheme");
+            if (updateThemeMethod != null)
+            {
+                updateThemeMethod.Invoke(_mainForm, new object[] { selectedTheme });
+            }
 
             // Update border form properties (parent controls these settings)
             _borderForm.UpdateOpacity(_opacityTrackBar.Value);
@@ -358,7 +362,11 @@ public class SettingsForm : Form
         base.OnFormClosed(e);
 
         // Restore original theme if cancelled
-        _mainForm.UpdateTheme(_configManager.Settings.SelectedTheme);
+        var updateThemeMethod = _mainForm.GetType().GetMethod("UpdateTheme");
+        if (updateThemeMethod != null)
+        {
+            updateThemeMethod.Invoke(_mainForm, new object[] { _configManager.Settings.SelectedTheme });
+        }
     }
 
     private void SettingsForm_Paint(object? sender, PaintEventArgs e)

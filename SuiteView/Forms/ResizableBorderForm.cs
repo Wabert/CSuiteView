@@ -11,7 +11,7 @@ namespace SuiteView.Forms;
 public class ResizableBorderForm : Form
 {
     private readonly ConfigManager _configManager;
-    private MainForm? _contentForm;
+    private Form? _contentForm;
     private const int BorderThickness = 5;
     private const int ResizeBorderWidth = 10;
 
@@ -114,7 +114,7 @@ public class ResizableBorderForm : Form
         }
     }
 
-    public void SetContentForm(MainForm contentForm)
+    public void SetContentForm(Form contentForm)
     {
         _contentForm = contentForm;
         _contentForm.TopLevel = false;

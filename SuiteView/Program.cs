@@ -12,7 +12,7 @@ static class Program
     private static ConfigManager? _configManager;
     private static SystemTrayManager? _systemTrayManager;
     private static ResizableBorderForm? _borderForm;
-    private static MainForm? _mainForm;
+    private static MainFormNew? _mainForm;
 
     /// <summary>
     /// The main entry point for the application.
@@ -37,7 +37,7 @@ static class Program
 
             // Create border form (parent) and main form (child content)
             _borderForm = new ResizableBorderForm(_configManager);
-            _mainForm = new MainForm(_configManager);
+            _mainForm = new MainFormNew(_configManager);
 
             // Set up the parent-child relationship
             _mainForm.SetParentBorderForm(_borderForm);

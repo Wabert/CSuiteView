@@ -1,5 +1,6 @@
 using SuiteView.Managers;
 using SuiteView.Models;
+using SuiteView.Forms.LayeredForms;
 
 namespace SuiteView.Forms;
 
@@ -22,6 +23,7 @@ public partial class MainForm : Form
     private Button _scanDirButton = null!;
     private Button _dbLibraryButton = null!;
     private Button _threePanelButton = null!;
+    private Button _formBuilderButton = null!;
     private Form? _parentBorderForm;
     private WordDocumentManager? _wordDocManager;
 
@@ -159,10 +161,27 @@ public partial class MainForm : Form
         _threePanelButton.FlatAppearance.MouseOverBackColor = Color.Transparent;
         _threePanelButton.Click += ThreePanelButton_Click;
 
+        // Form Builder button (transparent - will be drawn as round in Paint)
+        _formBuilderButton = new Button
+        {
+            Text = "",
+            Size = new Size(120, 32),
+            Location = new Point(20, 200), // Will be adjusted in UpdateLayout
+            FlatStyle = FlatStyle.Flat,
+            BackColor = Color.Transparent,
+            Cursor = Cursors.Hand,
+            TabStop = false
+        };
+        _formBuilderButton.FlatAppearance.BorderSize = 0;
+        _formBuilderButton.FlatAppearance.MouseDownBackColor = Color.Transparent;
+        _formBuilderButton.FlatAppearance.MouseOverBackColor = Color.Transparent;
+        _formBuilderButton.Click += FormBuilderButton_Click;
+
         _contentPanel.Controls.Add(_snapButton);
         _contentPanel.Controls.Add(_scanDirButton);
         _contentPanel.Controls.Add(_dbLibraryButton);
         _contentPanel.Controls.Add(_threePanelButton);
+        _contentPanel.Controls.Add(_formBuilderButton);
 
         this.Controls.Add(_contentPanel);
         this.Controls.Add(_titleLabel);
@@ -206,6 +225,9 @@ public partial class MainForm : Form
         
         // Position three panel button below DB library button
         _threePanelButton.Location = new Point(20, 155);
+        
+        // Position form builder button below three panel button
+        _formBuilderButton.Location = new Point(20, 200);
     }
 
     private void ApplyTheme()
@@ -323,6 +345,9 @@ public partial class MainForm : Form
         
         // Draw rounded three panel button
         DrawRoundedThreePanelButton(g);
+        
+        // Draw rounded form builder button
+        DrawRoundedFormBuilderButton(g);
     }
 
     private void DrawRoundCloseButton(Graphics g)
@@ -489,6 +514,41 @@ public partial class MainForm : Form
         }
     }
 
+    private void DrawRoundedFormBuilderButton(Graphics g)
+    {
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
+        // Button position in content panel coordinates
+        var buttonRect = _formBuilderButton.Bounds;
+
+        // Draw rounded brass background
+        const int cornerRadius = 16;
+        using (var path = new System.Drawing.Drawing2D.GraphicsPath())
+        {
+            path.AddArc(buttonRect.X, buttonRect.Y, cornerRadius, cornerRadius, 180, 90);
+            path.AddArc(buttonRect.Right - cornerRadius, buttonRect.Y, cornerRadius, cornerRadius, 270, 90);
+            path.AddArc(buttonRect.Right - cornerRadius, buttonRect.Bottom - cornerRadius, cornerRadius, cornerRadius, 0, 90);
+            path.AddArc(buttonRect.X, buttonRect.Bottom - cornerRadius, cornerRadius, cornerRadius, 90, 90);
+            path.CloseFigure();
+
+            using (var brush = new SolidBrush(_currentTheme.Accent))
+            {
+                g.FillPath(brush, path);
+            }
+        }
+
+        // Draw "Form Builder" text in blue
+        using (var font = new Font("Segoe UI", 9f, FontStyle.Bold))
+        using (var brush = new SolidBrush(_currentTheme.Primary))
+        {
+            var text = "Form Builder";
+            var size = g.MeasureString(text, font);
+            var x = buttonRect.X + (buttonRect.Width - size.Width) / 2;
+            var y = buttonRect.Y + (buttonRect.Height - size.Height) / 2;
+            g.DrawString(text, font, brush, x, y);
+        }
+    }
+
     #endregion
 
     #region Button Events
@@ -611,22 +671,26 @@ public partial class MainForm : Form
             // 1 Panel options
             menu.Items.Add("1 Panel (Header + Footer)", null, (s, args) => 
             {
-                var contentForm = new IndependentThreePanelForm(1, true, true, theme: _currentTheme);
-                var borderedWindow = new BorderedWindowForm(_currentTheme, 
-                    initialSize: new Size(1000, 600), 
-                    minimumSize: new Size(300, 200));
+                var borderedWindow = LayeredFormFactory.CreateThreeLayerForm(
+                    formWidth: 1000,
+                    formHeight: 600,
+                    layer2HeaderHeight: 30,
+                    layer2FooterHeight: 30,
+                    panelCount: 1,
+                    minimumSize: new Size(300, 200),
+                    theme: _currentTheme);
                 borderedWindow.Text = "1-Panel Form";
-                borderedWindow.SetContentForm(contentForm);
                 borderedWindow.Show();
             });
             menu.Items.Add("1 Panel (No Header/Footer)", null, (s, args) => 
             {
-                var contentForm = new IndependentThreePanelForm(1, false, false, theme: _currentTheme);
-                var borderedWindow = new BorderedWindowForm(_currentTheme, 
-                    initialSize: new Size(1000, 600), 
-                    minimumSize: new Size(300, 200));
+                var borderedWindow = LayeredFormFactory.CreateThreeLayerForm(
+                    formWidth: 1000,
+                    formHeight: 600,
+                    panelCount: 1,
+                    minimumSize: new Size(300, 200),
+                    theme: _currentTheme);
                 borderedWindow.Text = "1-Panel Form";
-                borderedWindow.SetContentForm(contentForm);
                 borderedWindow.Show();
             });
             
@@ -635,22 +699,27 @@ public partial class MainForm : Form
             // 2 Panel options
             menu.Items.Add("2 Panels (Header + Footer)", null, (s, args) => 
             {
-                var contentForm = new IndependentThreePanelForm(2, true, true, theme: _currentTheme);
-                var borderedWindow = new BorderedWindowForm(_currentTheme, 
-                    initialSize: new Size(1000, 600), 
-                    minimumSize: new Size(300, 200));
+                var borderedWindow = LayeredFormFactory.CreateThreeLayerForm(
+                    formWidth: 1000,
+                    formHeight: 600,
+                    layer2HeaderHeight: 30,
+                    layer2FooterHeight: 30,
+                    panelCount: 2,
+                    minimumSize: new Size(300, 200),
+                    theme: _currentTheme);
                 borderedWindow.Text = "2-Panel Form";
-                borderedWindow.SetContentForm(contentForm);
                 borderedWindow.Show();
             });
             menu.Items.Add("2 Panels (Header Only)", null, (s, args) => 
             {
-                var contentForm = new IndependentThreePanelForm(2, true, false, theme: _currentTheme);
-                var borderedWindow = new BorderedWindowForm(_currentTheme, 
-                    initialSize: new Size(1000, 600), 
-                    minimumSize: new Size(300, 200));
+                var borderedWindow = LayeredFormFactory.CreateThreeLayerForm(
+                    formWidth: 1000,
+                    formHeight: 600,
+                    layer2HeaderHeight: 30,
+                    panelCount: 2,
+                    minimumSize: new Size(300, 200),
+                    theme: _currentTheme);
                 borderedWindow.Text = "2-Panel Form";
-                borderedWindow.SetContentForm(contentForm);
                 borderedWindow.Show();
             });
             
@@ -659,32 +728,38 @@ public partial class MainForm : Form
             // 3 Panel options (default)
             menu.Items.Add("3 Panels (Header + Footer) ⭐", null, (s, args) => 
             {
-                var contentForm = new IndependentThreePanelForm(3, true, true, theme: _currentTheme);
-                var borderedWindow = new BorderedWindowForm(_currentTheme, 
-                    initialSize: new Size(1200, 700), 
-                    minimumSize: new Size(300, 200));
+                var borderedWindow = LayeredFormFactory.CreateThreeLayerForm(
+                    formWidth: 1200,
+                    formHeight: 700,
+                    layer2HeaderHeight: 30,
+                    layer2FooterHeight: 30,
+                    panelCount: 3,
+                    minimumSize: new Size(300, 200),
+                    theme: _currentTheme);
                 borderedWindow.Text = "3-Panel Form";
-                borderedWindow.SetContentForm(contentForm);
                 borderedWindow.Show();
             });
             menu.Items.Add("3 Panels (Footer Only)", null, (s, args) => 
             {
-                var contentForm = new IndependentThreePanelForm(3, false, true, theme: _currentTheme);
-                var borderedWindow = new BorderedWindowForm(_currentTheme, 
-                    initialSize: new Size(1200, 700), 
-                    minimumSize: new Size(300, 200));
+                var borderedWindow = LayeredFormFactory.CreateThreeLayerForm(
+                    formWidth: 1200,
+                    formHeight: 700,
+                    layer2FooterHeight: 30,
+                    panelCount: 3,
+                    minimumSize: new Size(300, 200),
+                    theme: _currentTheme);
                 borderedWindow.Text = "3-Panel Form";
-                borderedWindow.SetContentForm(contentForm);
                 borderedWindow.Show();
             });
             menu.Items.Add("3 Panels (No Header/Footer)", null, (s, args) => 
             {
-                var contentForm = new IndependentThreePanelForm(3, false, false, theme: _currentTheme);
-                var borderedWindow = new BorderedWindowForm(_currentTheme, 
-                    initialSize: new Size(1200, 700), 
-                    minimumSize: new Size(300, 200));
+                var borderedWindow = LayeredFormFactory.CreateThreeLayerForm(
+                    formWidth: 1200,
+                    formHeight: 700,
+                    panelCount: 3,
+                    minimumSize: new Size(300, 200),
+                    theme: _currentTheme);
                 borderedWindow.Text = "3-Panel Form";
-                borderedWindow.SetContentForm(contentForm);
                 borderedWindow.Show();
             });
             
@@ -693,22 +768,26 @@ public partial class MainForm : Form
             // 4 Panel options
             menu.Items.Add("4 Panels (Header + Footer)", null, (s, args) => 
             {
-                var contentForm = new IndependentThreePanelForm(4, true, true, theme: _currentTheme);
-                var borderedWindow = new BorderedWindowForm(_currentTheme, 
-                    initialSize: new Size(1400, 800), 
-                    minimumSize: new Size(300, 200));
+                var borderedWindow = LayeredFormFactory.CreateThreeLayerForm(
+                    formWidth: 1400,
+                    formHeight: 800,
+                    layer2HeaderHeight: 30,
+                    layer2FooterHeight: 30,
+                    panelCount: 4,
+                    minimumSize: new Size(300, 200),
+                    theme: _currentTheme);
                 borderedWindow.Text = "4-Panel Form";
-                borderedWindow.SetContentForm(contentForm);
                 borderedWindow.Show();
             });
             menu.Items.Add("4 Panels (No Header/Footer)", null, (s, args) => 
             {
-                var contentForm = new IndependentThreePanelForm(4, false, false, theme: _currentTheme);
-                var borderedWindow = new BorderedWindowForm(_currentTheme, 
-                    initialSize: new Size(1400, 800), 
-                    minimumSize: new Size(300, 200));
+                var borderedWindow = LayeredFormFactory.CreateThreeLayerForm(
+                    formWidth: 1400,
+                    formHeight: 800,
+                    panelCount: 4,
+                    minimumSize: new Size(300, 200),
+                    theme: _currentTheme);
                 borderedWindow.Text = "4-Panel Form";
-                borderedWindow.SetContentForm(contentForm);
                 borderedWindow.Show();
             });
             
@@ -720,6 +799,25 @@ public partial class MainForm : Form
         {
             MessageBox.Show(
                 $"Error opening Independent Panel Form: {ex.Message}",
+                "Error",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
+    }
+
+    private void FormBuilderButton_Click(object? sender, EventArgs e)
+    {
+        try
+        {
+            // Create and show the Form Builder using FormBuilderForm (which is a TwoLayerForm)
+            var formBuilder = new FormBuilderForm(_currentTheme);
+            formBuilder.Text = "Form Builder";
+            formBuilder.Show();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"Error opening Form Builder: {ex.Message}",
                 "Error",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
